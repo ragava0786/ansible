@@ -1,0 +1,382 @@
+###############################################################
+#----  Installation Steps for Dispatcher Server (IMPS DS) ----#
+###############################################################   
+
+###############################
+#         DISPATCHERS         #
+# IMPSHPUTDS0010v 10.15.6.11  #
+# IMPSHPUTDS0010v 10.15.6.12  #
+#                             #
+# Creater: Raghavan Rajaram   #
+###############################
+
+### TASK 1 & 2 ###
+   - name: " Assign System Properties "
+     net_system:
+      domain_name: prod.wspan.com
+      dest:  ANSBHPDVTS0050V
+      connection: network_cli
+      ansible_network_os: windows
+      become: yes
+      state: present
+      register: result
+     ignore_errors: true
+   - debug: msg="We dont priviledge To Assign hostname and ansible_network_os does't Suported"
+
+### TASK 3 ###
+   - name:   " Add Members to the group "
+     win_group_membership:
+         name: Users
+         members: 
+           - Galileo\svcsint 
+           - Prod\svcimps 
+           - Prod\IMPSAdmins 
+         state: present
+         register: result
+     ignore_errors: true
+   - debug: msg="account_name Prod\svcimps and Prod\IMPSAdmins is not a valid account, cannot get SID:"
+   - name: "  Assign Windows rights "
+     win_user_right:
+          name: "{{ item.name }}"
+          users: "{{ item.users }}"
+          action: add
+     with_items:
+          - { users: Galileo\svcsint , name: ADS }
+          - { users: Prod\svcimps , name: XXPASSLogs }
+          - { users: Prod\IMPSAdmins , name: remoteaccess }
+     ignore_errors: true
+   - debug: msg="Need  ADS XXPASSLogs remoteaccess  absalute Path"
+           
+
+### TASK 5,6 & 7 ###
+   
+   - name: " Install  the Applications "
+     win_package:
+           path: "{{ item }}"
+           state: present
+           register: result
+     with_items:
+          - Altiris Job-Generic - ADS Jobs - IMPS DS -  
+          - ADS_IMPS_??_64bit_Ddrive_NewInstall_.Net3.5
+          - Altiris Job-Generic\MS-XML Parser\MS-XML Parser 4.0 SP2
+          - Altiris Job-Generic – Tivoli – ITM – ITM_???_FE_OS_Agent_Install_6
+     ignore_errors: true
+   - debug: msg="product_id is required when the path is not an MSI or the path is an MSI but not local"
+
+
+### TASK 8 ###
+   - name: " Add the firewall rule "
+     win_firewall_rule:
+            name: "{{ item }}"
+            enabled: yes
+     with_items:
+           - SQL access
+           - Corp Access
+     register: result
+     failed_when: false
+ 
+   - name: " logging monitoring for these servers "
+     win_eventlog:
+          name: " Mynewlog "
+          sources:
+             - SQL access
+             - Corp Access
+     state: present
+     failed_when: false
+### TASK 9 ### 
+# TASK A
+
+   - name: " Copy Tomcat from correct server "
+     win_copy:
+         dest: D:\Tomcat from a current server.txt 
+         content: " Windows "
+     failed_when: false
+   - name: " Copy src to dest "
+     win_copy:
+          src: D:\Tomcat from a current server.txt
+          dest: D:\
+          remote_src: true
+     failed_when: false
+# TASK B
+
+   - name: " IMBDeliverables from a current server   "
+     win_copy:
+          dest: D:\IMBDeliverables from a current server.txt
+          content: " IMDB server details "
+   - name: " Copy src to dest "
+     win_copy:
+          src: D:\IMBDeliverables from a current server.txt
+          dest: D:\
+          remote_src: true 
+
+# TASK C 
+
+   - name: " Create a folder inside TEMP "
+     win_file:
+          path: D:\Temp
+          state: directory
+   - name: " create a directory java_tomcat_upgrade_20 inside TEMP "
+     win_file:
+          path: D:\Temp\java_tomcat_upgrade_20
+          state: directory
+   - name: " create a files inside Temp "
+     win_file:
+          src: D:\Temp
+          dest: "{{ item }}"
+          state: touch
+     with_items:
+          - nteventlogappender.dll
+          - AppropriateIMPSODBC.reg
+          - XXSPassLogs.NET4.zip
+          - ServerStatus.zip
+     failed_when: false
+#TASK D 
+   - name: " Create a folder jdk1.6.0_33 "
+     win_file:
+          path: D:\Temp\java_tomcat_upgrade_20\jdk1.6.0_33 
+          state: directory
+#TASK E 
+   - name: " create java_new_install.bat file "
+     win_file:
+          path: D:\Temp\java_tomcat_upgrade_20\java_new_install.bat 
+          state: touch
+   - name: " Add the content inside java_new_install.bat file "
+     win_copy:
+          dest: D:\Temp\java_tomcat_upgrade_20\java_new_install.bat
+          content:
+              echo " This is java_new_install.bat file"
+   - name: " To run java_new_install.bat "
+     win_command: D:\Temp\java_tomcat_upgrade_20\java_new_install.bat
+
+###########---TASK F---#############
+#   - name: " Run IMPSOBDC_??.reg "#
+####################################   
+
+#TASK G 
+   - name: " Copy TempNTEventLogAppender.dll to Windows SysWOW64 and Windows System32 "
+     win_file:
+          src: D:\Temp\nteventlogappender.dll
+          dest: "{{ item }}"
+     with_items:
+          - C:\Windows\SysWOW64 
+          - C:\Windows\System32    
+#### TASK H ####
+
+   - name: " Unzip the file "
+     win_unzip:
+         src: D:\Temp\SeverStatus.zip 
+         dest: D:\
+
+#### TASK i ####
+   - name: " To create TP_tomcat6_install_service.bat "
+     win_file:
+          path: D:\Temp\java_tomcat_upgrade_20\TP_tomcat6_install_service.bat  
+          state: touch
+   - name: " add the contentinside bat file "
+     win_copy:
+          dest: D:\Temp\java_tomcat_upgrade_20\TP_tomcat6_install_service.bat 
+          content:
+     win_command: D:\Temp\java_tomcat_upgrade_20\java_new_install.bat
+      
+#### TASK J ####
+   - name: " Create a directory IMBDeliverables "
+     win_file:
+         path: D:\IMBDeliverables\Dispatcher\config
+         state: directory 
+   - name: " Get updated IMBDeliverables Dispatcher config serverInfo.xml "
+     win_file:
+         path: D:\IMBDeliverables\Dispatcher\config\serverInfo.xml 
+         state: touch
+#### TASK K ####
+   - name: " Create a directory IMBDeliverables "
+     win_file:
+         path: D:\IMBDeliverables\Dispatcher\jars
+         state: directory
+     failed_when: false 
+   - name: " Get updated IMBDeliverables Dispatcher config JMSQ2DBClient.jar "
+     win_file:
+         path: D:\IMBDeliverables\Dispatcher\jars\JMSQ2DBClient.jar 
+         state: touch
+#### TASK L ####
+   - name: " create install.cmd file "
+     win_file:
+         path: D:\IMBDeliverables\Dispatcher\install.cmd
+         state: touch
+   - name: " add a content install.cmd "
+     win_copy:
+         dest: D:\IMBDeliverables\Dispatcher\install.cmd
+         content:
+             echo " Run Dipacher file "
+   - name: " D IMBDeliverables Dispatcher install.cmd "
+     win_command: D:\IMBDeliverables\Dispatcher\install.cmd
+#### TASK M ####
+   - name: " M. Copy D Temp jdk1.6.0_33 back to D Temp java_tomcat_upgrade_20 "
+     win_file:
+          src: D:\Temp\jdk1.6.0_33 
+          dest: "{{ item }}"
+     with_items:
+          - D:\Temp\java_tomcat_upgrade_20
+          
+#### TASK N ####
+   - name: " create install.cmd file "
+     win_file:
+         path: D:\Temp\java_tomcat_upgrade_20\java_tomcat_update.bat
+         state: touch
+   - name: " add a content install.cmd "
+     win_copy:
+         dest: D:\Temp\java_tomcat_upgrade_20\java_tomcat_update.bat
+         content:
+             echo " This is  java_tomcat_update.bat file "
+     failed_when: false
+   - name: " D IMBDeliverables Dispatcher install.cmd "
+     win_command: D:\Temp\java_tomcat_upgrade_20\java_tomcat_update.bat
+
+   
+
+#### TASK O ####
+   - name: " Unzip the file "
+     win_unzip:
+         src: XXSPassLogs.NET4.zip
+         dest: D:\
+     failed_when: false
+
+#### TASK P ####
+   - name: " Create directory XXSPassLogs "
+     win_file:
+          path: D:\XXSPassLogs
+          state: directory
+   - name: " create a install.bat file "
+     win_file:
+          path: D:\XXSPassLogs\install.bat  
+          state: touch
+   - name: " Add the content inside .bat file "
+     win_copy:
+          dest:  D:\XXSPassLogs\install.bat
+          content:
+              echo " This is XXSPassLogs install.bat   "
+   - name: " To run java_new_install.bat "
+     win_command: D:\XXSPassLogs\install.bat  
+
+   - name: " odbcad32.exe "
+     win_stat: path='C:\\Windows\\SysWOW64\\odbcad32.exe'
+     register: odbcad32_installed
+
+#########################
+##---- In Service  ----## 
+#########################
+   - name: " Restart the services "
+     win_service:
+            name: "{{ item }}"
+            state: restarted
+     with_items:
+           - Apache Tomcat 6
+           - XXSPassLogs
+           - DispatcherService
+           - MADSDeploymentClient
+     failed_when: false
+
+   - name: "  Assign Windows rights "
+     win_user_right:
+          name: "{{ item.name }}"
+          users: "{{ item.users }}"
+          password: password
+          action: add
+     with_items:
+          - { users: \svcimps , name: DispatcherService }
+     ignore_errors: true
+   - debug: msg="Need  XXS  remoteaccess  absalute Path"
+     failed_when: false
+
+
+
+###################################
+#-----         JAVA          -----#
+###################################
+   - name: " Create the directory Djdk "
+     win_file:
+          path: D:\jdk
+          state: directory
+   - name: " create a install.bat file "
+     win_file:
+          path:  D:\jdk\java_new_install.bat 
+          state: touch
+   - name: " Add the content  java_new_install bat file "
+     win_copy:
+          dest: D:\jdk\java_new_install.bat
+          content:
+              echo " JAVA_HOME "
+   - name: " To run java_new_install.bat "
+     win_command:  D:\jdk\java_new_install.bat
+
+
+   
+###################################
+#-----         TOMCAT        -----#
+###################################
+   
+ 
+   - name: " create a TP_tomcat6_install_service.bat file "
+     win_file:
+          path:  D:\Temp\java_tomcat_upgrade_20\TP_tomcat6_install_service.bat  
+          state: touch
+   - name: " Add content JAVA_HOME inside  TP_tomcat6_install_service file "
+     win_copy:
+          dest: D:\jdk\java_new_install.bat
+          content:
+              set TP_TC_ACCOUNT=PP\svcimps
+              set TP_TC_PASSWORD=svc0imps!
+              set TP_TC_PATH=D:\Tomcat
+              set TP_TC_JRE=D:\JDK\JRE
+   - name: " To run TP_tomcat6_install_service.bat file"
+     win_command:   D:\Temp\java_tomcat_upgrade_20\TP_tomcat6_install_service.bat
+
+
+   - name: " create the directory Tomcat onf "
+     win_file:
+          path: D:\Tomcat\conf
+          state: directory
+   - name: " create a server.xml file "
+     win_file:
+          path: D:\Tomcat\conf\server.xml   
+          state: touch
+   - name: " Add the content inside server.xml "
+     win_copy:
+          dest: D:\Tomcat\conf\server.xml 
+          content:
+               <Connector port="8888" protocol="HTTP/1.1" connectionTimeout="20000" redirectPort="8443" /> 
+   - name: " To run server.xml file "
+     win_command:  D:\Tomcat\conf\server.xml
+     failed_when: false
+
+   - name: " create tomcat-user.xml file "
+     win_file:
+          path: D:\Tomcat\conf\tomcat-user.xml 
+          state: touch
+   - name: " Add the xml content inside tomcat-user.xml file "
+     win_copy:
+          dest: D:\Tomcat\conf\tomcat-user.xml 
+          content:
+               <user name="admin" password="IMBAdmin" roles="admin,manager" />
+   - name: " To run tomcat-user.xml "      
+     win_command:  D:\Tomcat\conf\tomcat-user.xml 
+     failed_when: false
+
+
+   - name: " create the directory catalina localhost inside tomcat conf  "
+     win_file:
+          path: D:\Tomcat\conf\Catalina\localhost
+          state: directory
+   - name: " create a ServerStatus.xml file"
+     win_file:
+          path: D:\Tomcat\conf\Catalina\localhost\ServerStatus.xml 
+          state: touch
+   - name: " Add the  xml content inside ServerStatus.xml file "
+     win_copy:
+          dest: D:\Tomcat\conf\Catalina\localhost\ServerStatus.xml
+          content:
+               <Connector port="8888" protocol="HTTP/1.1" connectionTimeout="20000" redirectPort="8443" /> 
+   - name: " To run ServerStatus.xml file "
+     win_command: D:\Tomcat\conf\Catalina\localhost\ServerStatus.xml
+     failed_when: false
+
+
